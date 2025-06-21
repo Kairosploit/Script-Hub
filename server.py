@@ -1,35 +1,42 @@
 from flask import Flask, request, jsonify
-import json
-import os
+from flask_cors import CORS
 
 app = Flask(__name__)
-DB_FILE = 'db.json'
+CORS(app)
 
-# Ensure DB file exists
-if not os.path.exists(DB_FILE):
-    with open(DB_FILE, 'w') as f:
-        json.dump({'scripts': []}, f)
+# In-memory storage for simplicity. Replace with a database later.
+scripts = []
 
-def read_db():
-    with open(DB_FILE) as f:
-        return json.load(f)
+@app.route('/')
+def home():
+    return 'Kairosploit Script Hub Backend is running!'
 
-def write_db(data):
-    with open(DB_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+# POST /upload - Upload a new script
+@app.route('/upload', methods=['POST'])
+def upload_script():
+    data = request.get_json()
+    title = data.get('title')
+    description = data.get('description')
+    script = data.get('script')
 
+    if not all([title, description, script]):
+        return jsonify({'error': 'Missing fields'}), 400
+
+    script_data = {
+        'id': len(scripts) + 1,
+        'title': title,
+        'description': description,
+        'script': script
+    }
+
+    scripts.append(script_data)
+
+    return jsonify({'message': 'Script uploaded successfully', 'script': script_data}), 200
+
+# GET /scripts - Return all uploaded scripts
 @app.route('/scripts', methods=['GET'])
 def get_scripts():
-    data = read_db()
-    return jsonify(data['scripts'])
-
-@app.route('/scripts', methods=['POST'])
-def add_script():
-    new_script = request.json
-    db = read_db()
-    db['scripts'].append(new_script)
-    write_db(db)
-    return jsonify({"success": True}), 201
+    return jsonify(scripts), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(host='0.0.0.0', port=10000)
