@@ -1,51 +1,45 @@
-const express = require('express');
-const cors = require('cors');
-const { Low } = require('lowdb');
-const { JSONFile } = require('lowdb/node');
-const { nanoid } = require('nanoid');
+import express from 'express';
+import { Low } from 'lowdb';
+import { JSONFile } from 'lowdb/node';
 
 const app = express();
-const port = process.env.PORT || 3000;
+app.use(express.json());
 
 const adapter = new JSONFile('db.json');
 const db = new Low(adapter);
 
-app.use(cors());
-app.use(express.json());
+// Add default data here
+await db.read();
+db.data ||= { scripts: [] };
+await db.write();
 
-(async () => {
-  await db.read();
-  db.data ||= { scripts: [] };
-  await db.write();
-})();
-
+// Example route
 app.get('/scripts', async (req, res) => {
   await db.read();
   res.json(db.data.scripts);
 });
 
 app.post('/scripts', async (req, res) => {
-  const { name, unc, level, code, universal, supportedGames } = req.body;
-
-  if (!name || !unc || !level || !code) {
-    return res.status(400).send('Missing fields');
+  const { name, code, universal, games } = req.body;
+  if (!name || !code) {
+    return res.status(400).json({ error: 'Missing name or code' });
   }
 
   const newScript = {
-    id: nanoid(),
+    id: Date.now(),
     name,
-    unc,
-    level,
     code,
-    universal,
-    supportedGames: universal ? 'Universal' : supportedGames || ''
+    universal: !!universal,
+    games: universal ? [] : games || []
   };
 
   db.data.scripts.push(newScript);
   await db.write();
-  res.status(201).json({ success: true, id: newScript.id });
+
+  res.status(201).json({ success: true });
 });
 
-app.listen(port, () => {
-  console.log(`Script hub backend running on port ${port}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
