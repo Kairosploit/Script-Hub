@@ -1,54 +1,51 @@
 const express = require('express');
 const cors = require('cors');
-const { Low, JSONFile } = require('lowdb');
+const { Low } = require('lowdb');
+const { JSONFile } = require('lowdb/node');
 const { nanoid } = require('nanoid');
-const app = express();
-const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
+const app = express();
+const port = process.env.PORT || 3000;
 
 const adapter = new JSONFile('db.json');
 const db = new Low(adapter);
 
-async function initDB() {
+app.use(cors());
+app.use(express.json());
+
+(async () => {
   await db.read();
   db.data ||= { scripts: [] };
   await db.write();
-}
-initDB();
+})();
 
-// Upload script
-app.post('/upload', async (req, res) => {
-  const { name, level, unc, code } = req.body;
-  if (!name || !level || !unc || !code) return res.status(400).send({ error: 'Missing fields' });
+app.get('/scripts', async (req, res) => {
+  await db.read();
+  res.json(db.data.scripts);
+});
+
+app.post('/scripts', async (req, res) => {
+  const { name, unc, level, code, universal, supportedGames } = req.body;
+
+  if (!name || !unc || !level || !code) {
+    return res.status(400).send('Missing fields');
+  }
 
   const newScript = {
-    id: nanoid(8),
+    id: nanoid(),
     name,
-    level,
     unc,
+    level,
     code,
-    date: new Date().toISOString()
+    universal,
+    supportedGames: universal ? 'Universal' : supportedGames || ''
   };
 
   db.data.scripts.push(newScript);
   await db.write();
-  res.status(201).send({ success: true, script: newScript });
+  res.status(201).json({ success: true, id: newScript.id });
 });
 
-// Get all scripts
-app.get('/scripts', async (req, res) => {
-  await db.read();
-  res.send(db.data.scripts);
+app.listen(port, () => {
+  console.log(`Script hub backend running on port ${port}`);
 });
-
-// Get script by ID
-app.get('/scripts/:id', async (req, res) => {
-  await db.read();
-  const script = db.data.scripts.find(s => s.id === req.params.id);
-  if (!script) return res.status(404).send({ error: 'Script not found' });
-  res.send(script);
-});
-
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
